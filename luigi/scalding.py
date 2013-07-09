@@ -1,9 +1,9 @@
-import getpass
 import logging
 import os
 import re
 import subprocess
 
+from luigi import LocalTarget
 import configuration
 import hadoop
 import hadoop_jar
@@ -53,7 +53,7 @@ class ScaldingJobRunner(hadoop.JobRunner):
         self.libjars_dir = conf.get(
             'scalding', 'scalding-libjars', os.path.join(default, 'libjars'))
 
-        self.tmp_dir = conf.get('core', 'tmp-dir', '/tmp/luigi')
+        self.tmp_dir = LocalTarget(is_tmp=True)
 
     def _get_jars(self, path):
         return [os.path.join(path, j) for j in os.listdir(path)
@@ -92,16 +92,12 @@ class ScaldingJobRunner(hadoop.JobRunner):
     def get_libjars(self):
         return self._get_jars(self.libjars_dir)
 
-    def get_job_name(self, source):
-        return 'scalding-job-{0}-{1}'.format(
-            getpass.getuser(), os.path.basename(os.path.splitext(source)[0]))
-
-    def get_job_jar(self, job):
-        return os.path.join(
-            self.tmp_dir, self.get_job_name(job.source()) + '.jar')
+    def get_job_jar(self, source):
+        job_name = os.path.basename(os.path.splitext(source)[0])
+        return os.path.join(self.tmp_dir.path, job_name + '.jar')
 
     def get_build_dir(self, source):
-        build_dir = os.path.join(self.tmp_dir, self.get_job_name(source))
+        build_dir = os.path.join(self.tmp_dir.path, 'build')
         return build_dir
 
     def get_job_class(self, source):
@@ -123,7 +119,7 @@ class ScaldingJobRunner(hadoop.JobRunner):
 
     def build_job_jar(self, job):
         job_src = job.source()
-        job_jar = self.get_job_jar(job)
+        job_jar = self.get_job_jar(job_src)
         if os.path.exists(job_jar):
             src_mtime = os.path.getmtime(job_src)
             jar_mtime = os.path.getmtime(job_jar)
