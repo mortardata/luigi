@@ -214,6 +214,9 @@ class ScaldingJobTask(hadoop.BaseHadoopJobTask):
         atomically move them into place after the job finishes"""
         return True
 
+    def requires(self):
+        return {}
+
     def job_args(self):
         """Extra arguments to pass to the Scalding job"""
         return []
