@@ -120,11 +120,6 @@ class ScaldingJobRunner(hadoop.JobRunner):
     def build_job_jar(self, job):
         job_src = job.source()
         job_jar = self.get_job_jar(job_src)
-        if os.path.exists(job_jar):
-            src_mtime = os.path.getmtime(job_src)
-            jar_mtime = os.path.getmtime(job_jar)
-            if jar_mtime > src_mtime:
-                return job_jar
 
         build_dir = self.get_build_dir(job_src)
         if not os.path.exists(build_dir):
