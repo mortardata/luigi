@@ -210,11 +210,15 @@ class ScaldingJobTask(hadoop.BaseHadoopJobTask):
         return rel_path
 
     def source(self):
-        """Path to the scala source for this Scalding Job"""
+        """Path to the scala source for this Scalding Job
+        Either one of source() or jar() must be specified.
+        """
         return None
 
     def jar(self):
-        """Path to the jar file for this Scalding Job"""
+        """Path to the jar file for this Scalding Job
+        Either one of source() or jar() must be specified.
+        """
         return None
 
     def extra_jars(self):
