@@ -92,7 +92,7 @@ class ScaldingJobRunner(hadoop.JobRunner):
     def get_libjars(self):
         return self._get_jars(self.libjars_dir)
 
-    def get_job_jar(self, source):
+    def get_tmp_job_jar(self, source):
         job_name = os.path.basename(os.path.splitext(source)[0])
         return os.path.join(self.tmp_dir.path, job_name + '.jar')
 
@@ -118,8 +118,28 @@ class ScaldingJobRunner(hadoop.JobRunner):
             raise hadoop.HadoopJobError('Coudl not find scalding job class.')
 
     def build_job_jar(self, job):
+        job_jar = job.jar()
+        if job_jar:
+            if not os.path.exists(job_jar):
+                logger.error("Can't find jar: {0}, full path {1}".format(
+                             job_jar, os.path.abspath(job_jar)))
+                raise Exception("job jar does not exist")
+            if not job.job_class():
+                logger.error("Undefined job_class()")
+                raise Exception("Undefined job_class()")
+            return job_jar
+
         job_src = job.source()
-        job_jar = self.get_job_jar(job_src)
+        if not job_src:
+            logger.error("Both source() and jar() undefined")
+            raise Exception("Both source() and jar() undefined")
+        if not os.path.exists(job_src):
+            logger.error("Can't find source: {0}, full path {1}".format(
+                         job_src, os.path.abspath(job_src)))
+            raise Exception("job source does not exist")
+
+        job_src = job.source()
+        job_jar = self.get_tmp_job_jar(job_src)
 
         build_dir = self.get_build_dir(job_src)
         if not os.path.exists(build_dir):
@@ -146,11 +166,6 @@ class ScaldingJobRunner(hadoop.JobRunner):
         return job_jar
 
     def run_job(self, job):
-        if not job.source() or not os.path.exists(job.source()):
-            logger.error("Can't find source: {0}, full path {1}".format(
-                         job.source(), os.path.abspath(job.source())))
-            raise Exception("job source does not exist")
-
         job_jar = self.build_job_jar(job)
         jars = [job_jar] + self.get_libjars() + job.extra_jars()
         scalding_core = self.get_scalding_core()
@@ -196,6 +211,10 @@ class ScaldingJobTask(hadoop.BaseHadoopJobTask):
 
     def source(self):
         """Path to the scala source for this Scalding Job"""
+        return None
+
+    def jar(self):
+        """Path to the jar file for this Scalding Job"""
         return None
 
     def extra_jars(self):
