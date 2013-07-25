@@ -46,7 +46,7 @@ class ScaldingJobRunner(hadoop.JobRunner):
         default = os.environ.get('SCALA_HOME', '/usr/share/scala')
         self.scala_home = conf.get('scalding', 'scala-home', default)
 
-        default = os.environ.get('SCADLING_HOME', '/usr/share/scalding')
+        default = os.environ.get('SCALDING_HOME', '/usr/share/scalding')
         self.scalding_home = conf.get('scalding', 'scalding-home', default)
         self.provided_dir = conf.get(
             'scalding', 'scalding-provided', os.path.join(default, 'provided'))
