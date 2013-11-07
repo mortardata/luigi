@@ -15,9 +15,7 @@
 import worker
 import lock
 import logging
-from logging.config import fileConfig
-import tempfile
-import os
+import logging.config
 import rpc
 import optparse
 import scheduler
@@ -25,29 +23,20 @@ import warnings
 import configuration
 import task
 import parameter
+import re
+import argparse
+import sys
+import os
+
 from task import Register
 
 
-def setup_interface_logging():
+def setup_interface_logging(conf_file=None):
     # use a variable in the function object to determine if it has run before
     if getattr(setup_interface_logging, "has_run", False):
         return
-    
-    config = configuration.get_config()
-    if config.has_section('loggers'):
-        # configure logging from client.cfg.
-        # since config can come from multiple locations, write it out to
-        # a known temp location and read back in
-        _, tmp_path = tempfile.mkstemp(suffix='.ini', prefix='luigi-tmp-logging-config')
-        try:
-            with open(tmp_path, 'w') as tmp_file:
-                config.write(tmp_file)
-            fileConfig(tmp_path)
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                os.remove(tmp_path)
-    else:
-        # default logging configuration
+
+    if conf_file is None:
         logger = logging.getLogger('luigi-interface')
         logger.setLevel(logging.DEBUG)
 
@@ -58,6 +47,9 @@ def setup_interface_logging():
         streamHandler.setFormatter(formatter)
 
         logger.addHandler(streamHandler)
+    else:
+        logging.config.fileConfig(conf_file)
+
     setup_interface_logging.has_run = True
 
 
@@ -131,6 +123,12 @@ class Interface(object):
             worker_scheduler_factory = WorkerSchedulerFactory()
 
         env_params = EnvironmentParamsContainer.env_params(override_defaults)
+        logging_conf = configuration.get_config().get('core', 'logging_conf_file', None)
+        if logging_conf is not None and not os.path.exists(logging_conf):
+            raise Exception("Error: Unable to locate specified logging configuration file!")
+
+        if not configuration.get_config().getboolean('core', 'no_configure_logging', False):
+            setup_interface_logging(logging_conf)
 
         if env_params.lock and not(lock.acquire_for(env_params.lock_pid_dir)):
             sys.exit(1)
@@ -150,12 +148,48 @@ class Interface(object):
         w.stop()
 
 
+class ErrorWrappedArgumentParser(argparse.ArgumentParser):
+    ''' Wraps ArgumentParser's error message to suggested similar tasks
+    '''
+
+    # Simple unweighted Levenshtein distance
+    def _editdistance(self, a, b):
+        r0 = range(0, len(b) + 1)
+        r1 = [0] * (len(b) + 1)
+
+        for i in range(0, len(a)):
+            r1[0] = i + 1
+
+            for j in range(0, len(b)):
+                c = 0 if a[i] is b[j] else 1
+                r1[j + 1] = min(r1[j] + 1, r0[j + 1] + 1, r0[j] + c)
+
+            r0 = r1[:]
+
+        return r1[len(b)]
+
+    def error(self, message):
+        result = re.match("argument .+: invalid choice: '(\w+)'.+", message)
+        if result:
+            arg = result.group(1)
+            weightedTasks = [(self._editdistance(arg, task), task) for task in Register.get_reg().keys()]
+            orderedTasks = sorted(weightedTasks, key=lambda pair: pair[0])
+            candidates = [task for (dist, task) in orderedTasks if dist <= 5 and dist < len(task)]
+            displaystring = ""
+            if candidates:
+                displaystring = "No task %s. Did you mean:\n%s" % (arg, '\n'.join(candidates))
+            else:
+                displaystring = "No task %s." % arg
+            super(ErrorWrappedArgumentParser, self).error(displaystring)
+        else:
+            super(ErrorWrappedArgumentParser, self).error(message)
+
+
 class ArgParseInterface(Interface):
     ''' Takes the task as the command, with parameters specific to it
     '''
     def parse(self, cmdline_args=None, main_task_cls=None):
-        import argparse
-        parser = argparse.ArgumentParser()
+        parser = ErrorWrappedArgumentParser()
 
         def _add_parameter(parser, param_name, param, prefix=None):
             description = []
@@ -190,7 +224,8 @@ class ArgParseInterface(Interface):
             _add_task_parameters(parser, main_task_cls)
 
         else:
-            subparsers = parser.add_subparsers(dest='command')
+            orderedtasks = '{%s}' % ','.join(sorted(Register.get_reg().keys()))
+            subparsers = parser.add_subparsers(dest='command', metavar=orderedtasks)
 
             for name, cls in Register.get_reg().iteritems():
                 subparser = subparsers.add_parser(name)
@@ -328,10 +363,9 @@ def run(cmdline_args=None, existing_optparse=None, use_optparse=False, main_task
     ''' Run from cmdline.
 
     The default parser uses argparse.
-    However for legacy reasons we support optparse that optinally allows for
+    However for legacy reasons we support optparse that optionally allows for
     overriding an existing option parser with new args.
     '''
-    setup_interface_logging()
     if use_optparse:
         interface = OptParseInterface(existing_optparse)
     else:
@@ -347,5 +381,4 @@ def build(tasks, worker_scheduler_factory=None, **env_params):
     Example
     luigi.build([MyTask1(), MyTask2()], local_scheduler=True)
     '''
-    setup_interface_logging()
     Interface.run(tasks, worker_scheduler_factory, env_params)

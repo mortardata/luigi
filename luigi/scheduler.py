@@ -63,13 +63,14 @@ class CentralPlannerScheduler(Scheduler):
     Can be run locally or on a server (using RemoteScheduler + server.Server).
     '''
 
-    def __init__(self, retry_delay=900.0, remove_delay=600.0, worker_disconnect_delay=60.0, task_history=None,
-                 scheduler_engine=None):
+    def __init__(self, retry_delay=900.0, remove_delay=600.0, worker_disconnect_delay=60.0, 
+                 state_path='/var/lib/luigi-server/state.pickle', task_history=None, scheduler_engine=None):
         '''
         (all arguments are in seconds)
         Keyword Arguments:
         retry_delay -- How long after a Task fails to try it again, or -1 to never retry
         remove_delay -- How long after a Task finishes to remove it from the scheduler
+        state_path -- Path to state file (tasks and active workers)
         worker_disconnect_delay -- If a worker hasn't communicated for this long, remove it from active workers
         '''
         self._retry_delay = retry_delay
@@ -77,7 +78,7 @@ class CentralPlannerScheduler(Scheduler):
         self._worker_disconnect_delay = worker_disconnect_delay
         self._task_history = task_history or history.NopHistory()
         self._scheduler_engine = \
-            scheduler_engine or PickleSchedulerEngine('/var/lib/luigi-server/state.pickle')
+            scheduler_engine or PickleSchedulerEngine(state_path)
 
     def dump(self):
         self._scheduler_engine.dump()
@@ -308,7 +309,7 @@ class CentralPlannerScheduler(Scheduler):
         if task_id not in serialized:
             task = tasks.get(task_id)
             if task is None:
-                logger.warn('Missing task for id [%s]' % task_id)
+                logger.warn('Missing task for id [%s]', task_id)
                 serialized[task_id] = {
                     'deps': [],
                     'status': UNKNOWN,
