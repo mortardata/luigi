@@ -13,15 +13,17 @@
 # the License.
 import itertools
 import logging
+import os
 import os.path
 import random
 import tempfile
 import urlparse
 
-from boto.s3.connection import S3Connection
+import boto
 from boto.s3.key import Key
 
 import configuration
+from ConfigParser import NoSectionError, NoOptionError
 from luigi.parameter import Parameter
 from luigi.target import FileSystem
 from luigi.target import FileSystemTarget
@@ -45,30 +47,30 @@ class S3Client(FileSystem):
     """
     boto-powered S3 client.
     """
-        
+
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None):
         if not aws_access_key_id:
-            aws_access_key_id = configuration.get_config().get('s3', 'aws_access_key_id')
+            aws_access_key_id = self._get_s3_config('aws_access_key_id')
         if not aws_secret_access_key:
-            aws_secret_access_key = configuration.get_config().get('s3', 'aws_secret_access_key')
-        
-        self.s3 = S3Connection(aws_access_key_id,
-                               aws_secret_access_key,
-                               is_secure=True)
-        
+            aws_secret_access_key = self._get_s3_config('aws_secret_access_key')
+
+        self.s3 = boto.connect_s3(aws_access_key_id,
+                                  aws_secret_access_key,
+                                  is_secure=True)
+
     def exists(self, path):
         """
         Does provided path exist on S3?
         """
         (bucket, key) = self._path_to_bucket_and_key(path)
-        
+
         # grab and validate the bucket
         s3_bucket = self.s3.get_bucket(bucket, validate=True)
 
         # root always exists
         if self._is_root(key):
             return True
-        
+
         # file
         s3_key = s3_bucket.get_key(key)
         if s3_key:
@@ -77,7 +79,7 @@ class S3Client(FileSystem):
         if self.is_dir(path):
             return True
         
-        logger.debug('Path %s does not exist' % path)
+        logger.debug('Path %s does not exist', path)
         return False
     
     def remove(self, path, recursive=True):
@@ -85,7 +87,7 @@ class S3Client(FileSystem):
         Remove a file or directory from S3.
         """
         if not self.exists(path):
-            logger.debug('Could not delete %s; path does not exist' % path)
+            logger.debug('Could not delete %s; path does not exist', path)
             return False
 
         (bucket, key) = self._path_to_bucket_and_key(path)
@@ -101,7 +103,7 @@ class S3Client(FileSystem):
         s3_key = s3_bucket.get_key(key)
         if s3_key:
             s3_bucket.delete_key(s3_key)
-            logger.debug('Deleting %s from bucket %s' % (key, bucket))
+            logger.debug('Deleting %s from bucket %s', key, bucket)
             return True
 
         if self.is_dir(path) and not recursive:
@@ -111,7 +113,7 @@ class S3Client(FileSystem):
 
         if len(delete_key_list) > 0:
             for k in delete_key_list:
-                logger.debug('Deleting %s from bucket %s' % (k, bucket))
+                logger.debug('Deleting %s from bucket %s', k, bucket)
             s3_bucket.delete_keys(delete_key_list)
             return True
         
@@ -167,14 +169,22 @@ class S3Client(FileSystem):
 
         return False
 
+    def _get_s3_config(self, key):
+        try:
+            return configuration.get_config().get('s3', key)
+        except NoSectionError:
+            return None
+        except NoOptionError:
+            return None
+
     def _path_to_bucket_and_key(self, path):
         (scheme, netloc, path, query, fragment) = urlparse.urlsplit(path)
         path_without_initial_slash = path[1:]
         return netloc, path_without_initial_slash
-    
+
     def _is_root(self, key):
         return (len(key) == 0) or (key == '/')
-    
+
     def _add_path_delimiter(self, key):
         return key if key[-1:] == '/' else key + '/'
 
@@ -214,6 +224,7 @@ class ReadableS3File(object):
 
     def __init__(self, s3_key):
         self.s3_key = s3_key
+        self.buffer = []
 
     def read(self, size=0):
         return self.s3_key.read(size=size)
@@ -225,6 +236,50 @@ class ReadableS3File(object):
         self.close()
 
     def __exit__(self, exc_type, exc, traceback):
+        self.close()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, type, value, traceback):
+        self.close()
+    
+    def _add_to_buffer(self, line):
+        self.buffer.append(line)
+    
+    def _flush_buffer(self):
+        output = ''.join(self.buffer)
+        self.buffer = []
+        return output
+    
+    def __iter__(self):
+        key_iter = self.s3_key.__iter__()
+        
+        has_next = True
+        while has_next:
+            try:
+                # grab the next chunk
+                chunk = key_iter.next()
+                
+                # split on newlines, preserving the newline
+                for line in chunk.splitlines(True):
+                    
+                    if not line.endswith(os.linesep):
+                        # no newline, so store in buffer
+                        self._add_to_buffer(line)
+                    else:
+                        # newline found, send it out
+                        if self.buffer:
+                            self._add_to_buffer(line)
+                            yield self._flush_buffer()
+                        else:
+                            yield line
+            except StopIteration:
+                # send out anything we have left in the buffer
+                output = self._flush_buffer()
+                if output:
+                    yield output
+                has_next = False
         self.close()
 
 class S3Target(FileSystemTarget):
