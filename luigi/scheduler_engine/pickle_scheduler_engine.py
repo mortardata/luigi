@@ -69,8 +69,8 @@ class PickleSchedulerEngine(scheduler_engine.SchedulerEngine):
         # noop: tasks are stored in RAM, so already saved
         return task
 
-    def remove_tasks(self, task_ids):
-        for task_id in tasks_ids:
+    def delete_tasks(self, task_ids):
+        for task_id in task_ids:
             self._tasks.pop(task_id)
 
     def delete_workers(self, workers):

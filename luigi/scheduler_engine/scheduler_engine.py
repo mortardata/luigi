@@ -56,5 +56,5 @@ class SchedulerEngine(object):
         pass
 
     @abc.abstractmethod
-    def remove_tasks(self, task_ids):
+    def delete_tasks(self, task_ids):
         pass

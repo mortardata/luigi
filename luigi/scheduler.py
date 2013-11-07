@@ -136,7 +136,7 @@ class CentralPlannerScheduler(Scheduler):
                 self._scheduler_engine.update_task(task_id, task)
 
         if remove_task_ids:
-            self_task_history.remove_tasks(remove_task_ids)
+            self._scheduler_engine.delete_tasks(remove_task_ids)
         logger.info("Done pruning task graph")
 
     def update(self, worker):
