@@ -80,10 +80,10 @@ class CentralPlannerScheduler(Scheduler):
             scheduler_engine or PickleSchedulerEngine('/var/lib/luigi-server/state.pickle')
 
     def dump(self):
-        self._scheduler_enginer.dump()
+        self._scheduler_engine.dump()
 
     def load(self):
-        self._scheduler_enginer.load()
+        self._scheduler_engine.load()
 
     def prune(self):
         """
