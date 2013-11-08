@@ -155,10 +155,7 @@ class CentralPlannerScheduler(Scheduler):
         """
         self.update(worker)
 
-        task = self._scheduler_engine.get_task(task_id)
-        if not task:
-            task = Task(PENDING, deps)
-            self._scheduler_engine.add_task(task_id, task)
+        task = self._scheduler_engine.find_or_add_task(task_id, Task(PENDING, deps))
 
         if task.remove is not None:
             task.remove = None  # unmark task for removal so it isn't removed after being added

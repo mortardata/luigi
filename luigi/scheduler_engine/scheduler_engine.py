@@ -48,7 +48,7 @@ class SchedulerEngine(object):
         pass
 
     @abc.abstractmethod
-    def add_task(self, task_id, task):
+    def find_or_add_task(self, task_id, task):
         pass
 
     @abc.abstractmethod

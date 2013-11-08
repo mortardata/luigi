@@ -61,9 +61,8 @@ class PickleSchedulerEngine(scheduler_engine.SchedulerEngine):
     def get_tasks(self):
         return self._tasks
 
-    def add_task(self, task_id, task):
-        self._tasks[task_id] = task
-        return task
+    def find_or_add_task(self, task_id, task):
+        return self._tasks.setdefault(task_id, task)
 
     def update_task(self, task_id, task):
         # noop: tasks are stored in RAM, so already saved
