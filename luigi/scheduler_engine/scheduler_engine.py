@@ -13,6 +13,24 @@
 # the License.
 
 import abc
+import time
+
+class Task(object):
+    def __init__(self, status, deps, stakeholders=None, workers=None, timestamp=None, 
+        retry=None, remove=None, worker_running=None, expl=None):
+        """"""
+        self.stakeholders = set(stakeholders) if stakeholders else set() # workers that are somehow related to this task (i.e. don't prune while any of these workers are still active)
+        self.workers = set(workers) if workers else set() # workers that can perform task - task is 'BROKEN' if none of these workers are active
+        self.deps = set(deps) if deps else set()
+        self.status = status  # PENDING, RUNNING, FAILED or DONE
+        self.time = timestamp or time.time()
+        self.retry = retry
+        self.remove = remove
+        self.worker_running = worker_running  # the worker that is currently running the task or None
+        self.expl = expl
+
+    def __repr__(self):
+        return "Task(%r)" % vars(self)
 
 class SchedulerEngine(object):
     """
@@ -40,7 +58,7 @@ class SchedulerEngine(object):
         pass
 
     @abc.abstractmethod
-    def get_task(self):
+    def get_task(self, task_id):
         pass
 
     @abc.abstractmethod

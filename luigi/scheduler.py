@@ -15,7 +15,8 @@
 import logging
 import time
 import task_history as history
-from scheduler_engine.pickle_scheduler_engine import PickleSchedulerEngine
+from luigi.scheduler_engine.pickle_scheduler_engine import PickleSchedulerEngine
+from luigi.scheduler_engine.scheduler_engine import Task as SchedulerTask
 
 logger = logging.getLogger("luigi.server")
 
@@ -39,23 +40,12 @@ UPSTREAM_SEVERITY_ORDER = ('', UPSTREAM_RUNNING, UPSTREAM_MISSING_INPUT, UPSTREA
 UPSTREAM_SEVERITY_KEY = lambda st: UPSTREAM_SEVERITY_ORDER.index(st)
 STATUS_TO_UPSTREAM_MAP = {FAILED: UPSTREAM_FAILED, RUNNING: UPSTREAM_RUNNING, PENDING: UPSTREAM_MISSING_INPUT}
 
-class Task(object):
-    def __init__(self, status, deps, stakeholders=None, workers=None, timestamp=None, 
-        retry=None, remove=None, worker_running=None, expl=None):
-        """"""
-        self.stakeholders = set(stakeholders) if stakeholders else set() # workers that are somehow related to this task (i.e. don't prune while any of these workers are still active)
-        self.workers = set(workers) if workers else set() # workers that can perform task - task is 'BROKEN' if none of these workers are active
-        self.deps = set(deps) if deps else set()
-        self.status = status  # PENDING, RUNNING, FAILED or DONE
-        self.time = timestamp or time.time()
-        self.retry = retry
-        self.remove = remove
-        self.worker_running = worker_running  # the worker that is currently running the task or None
-        self.expl = expl
-
-    def __repr__(self):
-        return "Task(%r)" % vars(self)
-
+class Task(SchedulerTask):
+    """
+    TODO: Remove this once all existing pickle tasks have been
+    migrated to new class location.
+    """
+    pass
 
 class CentralPlannerScheduler(Scheduler):
     ''' Async scheduler that can handle multiple workers etc
