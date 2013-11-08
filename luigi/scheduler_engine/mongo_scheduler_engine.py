@@ -85,6 +85,7 @@ class MongoSchedulerEngine(scheduler_engine.SchedulerEngine):
     def _scheduler_task_to_db_task(self, task_id, task):
         return {'task_id': task_id,
                 'status': task.status,
+                'deps': list(task.deps),
                 'stakeholders': list(task.stakeholders),
                 'workers': list(task.workers),
                 'time': task.time,
