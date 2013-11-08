@@ -37,13 +37,27 @@ def _create_scheduler():
     retry_delay = config.getfloat('scheduler', 'retry-delay', 900.0)
     remove_delay = config.getfloat('scheduler', 'remove-delay', 600.0)
     worker_disconnect_delay = config.getfloat('scheduler', 'worker-disconnect-delay', 60.0)
-    state_path = config.get('scheduler', 'state-path', '/var/lib/luigi-server/state.pickle')
+
+    # task history
     if config.getboolean('scheduler', 'record_task_history', False):
         import db_task_history  # Needs sqlalchemy, thus imported here
         task_history_impl = db_task_history.DbTaskHistory()
     else:
         task_history_impl = task_history.NopHistory()
-    return scheduler.CentralPlannerScheduler(retry_delay, remove_delay, worker_disconnect_delay, state_path, task_history_impl)
+
+    # scheduler engine
+    scheduler_engine_name = config.get('scheduler', 'engine', 'PickleSchedulerEngine')
+    if scheduler_engine_name == 'PickleSchedulerEngine':
+        from scheduler_engine.pickle_scheduler_engine import PickleSchedulerEngine
+        scheduler_engine = PickleSchedulerEngine()
+    elif scheduler_engine_name == 'MongoSchedulerEngine':
+        from scheduler_engine.mongo_scheduler_engine import MongoSchedulerEngine
+        scheduler_engine = MongoSchedulerEngine()
+    else:
+        raise RuntimeError('Unsupported scheduler engine: %s' % scheduler_engine_name)
+
+    return scheduler.CentralPlannerScheduler(retry_delay, remove_delay, worker_disconnect_delay, 
+        scheduler_engine, task_history_impl)
 
 
 class RPCHandler(tornado.web.RequestHandler):

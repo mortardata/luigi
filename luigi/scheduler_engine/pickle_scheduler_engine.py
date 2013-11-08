@@ -16,14 +16,17 @@ import cPickle as pickle
 import logging
 import os
 
+from luigi import configuration
 from luigi.scheduler_engine import scheduler_engine
 
 logger = logging.getLogger("luigi.server")
 
 class PickleSchedulerEngine(scheduler_engine.SchedulerEngine):
 
-    def __init__(self, state_path):
-        self._state_path = state_path
+    def __init__(self, state_path=None):
+        config = configuration.get_config()
+        self._state_path = state_path or \
+            config.get('scheduler', 'state-path', '/var/lib/luigi-server/state.pickle')
         self._tasks = {} # dict from task_id to Task
         self._workers = {}  # dict from id to timestamp (last updated)
 

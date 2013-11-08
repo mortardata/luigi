@@ -54,7 +54,7 @@ class CentralPlannerScheduler(Scheduler):
     '''
 
     def __init__(self, retry_delay=900.0, remove_delay=600.0, worker_disconnect_delay=60.0, 
-                 state_path='/var/lib/luigi-server/state.pickle', task_history=None, scheduler_engine=None):
+                 scheduler_engine=None, task_history=None):
         '''
         (all arguments are in seconds)
         Keyword Arguments:
@@ -68,7 +68,7 @@ class CentralPlannerScheduler(Scheduler):
         self._worker_disconnect_delay = worker_disconnect_delay
         self._task_history = task_history or history.NopHistory()
         self._scheduler_engine = \
-            scheduler_engine or PickleSchedulerEngine(state_path)
+            scheduler_engine or PickleSchedulerEngine()
 
     def dump(self):
         self._scheduler_engine.dump()

@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from luigi import configuration
 from luigi.scheduler_engine import scheduler_engine
 
 from pymongo import MongoClient
@@ -19,11 +20,19 @@ from pymongo import MongoClient
 class MongoSchedulerEngine(scheduler_engine.SchedulerEngine):
     """
     """
-    def __init__(self, mongo_uri, workers_collection='luigi_workers', tasks_collection='luigi_tasks'):
+    def __init__(self, mongo_uri=None, workers_collection_name=None, tasks_collection_name=None):
+        config = configuration.get_config()
+        mongo_uri = mongo_uri or \
+            config.get('scheduler', 'mongo-uri')
+        workers_collection_name = workers_collection_name or \
+            config.get('scheduler', 'workers-collection-name', 'luigi_workers')
+        tasks_collection_name = tasks_collection_name or \
+            config.get('scheduler', 'tasks-collection-name', 'luigi_tasks')
+
         self.client = MongoClient(mongo_uri)
         self.db = self.client.get_default_database()
-        self.workers_collection = self.db[workers_collection]
-        self.tasks_collection = self.db[tasks_collection]
+        self.workers_collection = self.db[workers_collection_name]
+        self.tasks_collection = self.db[tasks_collection_name]
     
     def load(self):
         self.workers_collection.ensure_index('worker_id', unique=True)
